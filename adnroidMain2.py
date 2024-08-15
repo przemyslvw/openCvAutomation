@@ -10,7 +10,7 @@ server_socket.listen(1)
 conn, addr = server_socket.accept()
 
 # Adres URL streamu RTSP
-stream_url = "rtsp://192.168.0.101:8080/h264_ulaw.sdp"
+stream_url = "rtsp://192.168.0.102:8080/h264_ulaw.sdp"
 cap = cv2.VideoCapture(stream_url)
 
 while True:
