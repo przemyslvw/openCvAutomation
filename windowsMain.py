@@ -5,7 +5,7 @@ import pickle
 
 # Ustawienia socket
 client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-client_socket.connect(('IP_Raspberry_Pi', 8485))
+client_socket.connect(('192.168.0.12', 8485))
 
 data = b""
 payload_size = struct.calcsize(">L")
