@@ -14,6 +14,7 @@ def simple_bluetooth_scan():
         print(f"stdout: {result.stdout}")
     except subprocess.CalledProcessError as e:
         print("Failed to start Bluetooth scan.")
+        print(f"stdout: {e.stdout}")
         print(f"stderr: {e.stderr}")
     except FileNotFoundError:
         print("bluetoothctl command not found. Please install it and ensure it is in the PATH.")
