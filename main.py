@@ -18,7 +18,6 @@ def scan_bluetooth_devices():
     # Check if HackRF is connected
     if not is_hackrf_connected():
         print("No HackRF device connected.")
-        return
 
     # Ensure hackrf_sweep is installed
     try:
