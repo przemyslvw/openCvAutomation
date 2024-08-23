@@ -15,11 +15,9 @@ def is_hackrf_connected():
         return False
 
 def scan_bluetooth_devices():
-    # Check if HackRF is connected
     if not is_hackrf_connected():
         print("No HackRF device connected.")
 
-    # Ensure hackrf_sweep is installed
     try:
         subprocess.run(["hackrf_sweep", "-h"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
     except subprocess.CalledProcessError as e:
@@ -27,9 +25,9 @@ def scan_bluetooth_devices():
         print(f"stderr: {e.stderr}")
         return
 
-    # Run hackrf_sweep to scan for Bluetooth devices
     try:
-        result = subprocess.run(["hackrf_sweep", "-f", "2400:2483.5", "-a", "1", "-l", "16", "-g", "20"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        # Używamy precyzyjnych częstotliwości w Hz
+        result = subprocess.run(["hackrf_sweep", "-f", "2400000000:2483500000", "-a", "1", "-l", "16", "-g", "20"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
         output = result.stdout
         print("Detected Bluetooth devices:")
         print(output)
