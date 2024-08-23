@@ -5,10 +5,14 @@ def is_hackrf_connected():
     try:
         result = subprocess.run(["hackrf_info"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = result.stdout.decode()
+        print("hackrf_info output:")
+        print(output)
         if "No HackRF boards found." in output:
             return False
         return True
-    except subprocess.CalledProcessError:
+    except subprocess.CalledProcessError as e:
+        print(f"Error running hackrf_info: {e}")
+        print(f"stderr: {e.stderr.decode('utf-8')}")
         return False
 
 def scan_bluetooth_devices():
