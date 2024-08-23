@@ -1,10 +1,19 @@
 import pyhackrf
 import time
+from scapy.all import *
 
 def hackrf_callback(data, length, context):
     # Przetwarzaj odebrane dane
     print(f"Odebrano {length} bajtów danych")
-    # Tutaj można dodać kod do analizy pakietów Bluetooth
+    
+    # Kod do analizy pakietów Bluetooth
+    # Przykład: analiza danych za pomocą Scapy
+    packets = Raw(data)
+    for packet in packets:
+        if packet.haslayer(Bluetooth):
+            bt_layer = packet.getlayer(Bluetooth)
+            print(f"Znaleziono urządzenie Bluetooth: {bt_layer.addr}")
+
     return 0
 
 def initialize_hackrf(frequency):
