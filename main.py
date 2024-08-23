@@ -26,7 +26,7 @@ def scan_bluetooth_devices():
 
     # Run hackrf_sweep to scan for Bluetooth devices
     try:
-        result = subprocess.run(["hackrf_sweep", "-f", "2400 2483.5", "-a", "1", "-l", "16", "-g", "20"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
+        result = subprocess.run(["hackrf_sweep", "-f", "2400:2483.5", "-a", "1", "-l", "16", "-g", "20"], check=True, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
         output = result.stdout.decode('utf-8')
         print("Detected Bluetooth devices:")
         print(output)
