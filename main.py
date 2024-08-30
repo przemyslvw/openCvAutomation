@@ -1,39 +1,45 @@
-import os
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.io import wavfile
 from scipy.fft import fft, fftfreq
+import os
 
-# Ustawienia odbioru
-frequency = 915e6  # Częstotliwość odbioru (915 MHz)
-sample_rate = 10e6  # Prędkość próbkowania (10 MS/s)
-duration = 5  # Czas trwania w sekundach
+# Ścieżka do pliku z danymi
+file_path = 'captured_data.bin'
 
-# Komenda do odbioru sygnału
-os.system(f'hackrf_transfer -r captured_data.bin -f {frequency} -s {sample_rate} -t {duration}')
+# Sprawdź, czy plik istnieje
+if not os.path.exists(file_path):
+    raise FileNotFoundError(f"Plik {file_path} nie został znaleziony. Upewnij się, że 'hackrf_transfer' został prawidłowo wykonany.")
 
 # Odczytaj dane z pliku binarnego
 def read_binary_file(file_path):
+    # Wczytaj dane jako dane o typie np.complex64
     data = np.fromfile(file_path, dtype=np.complex64)
     return data
 
-data = read_binary_file('captured_data.bin')
+data = read_binary_file(file_path)
+
+# Sprawdź długość danych
+print(f"Liczba próbek: {len(data)}")
 
 # Analiza sygnału
 N = len(data)
+sample_rate = 10e6  # Prędkość próbkowania
 yf = fft(data)
 xf = fftfreq(N, 1 / sample_rate)
 
 # Wizualizacja
-plt.figure(figsize=(10, 6))
+plt.figure(figsize=(12, 8))
 
+# Wykres danych
 plt.subplot(2, 1, 1)
 plt.title('Odczytane dane')
-plt.plot(np.real(data))
-plt.plot(np.imag(data))
+plt.plot(np.real(data), label='Realna część')
+plt.plot(np.imag(data), label='Imaginacyjna część')
 plt.xlabel('Próbki')
 plt.ylabel('Amplituda')
+plt.legend()
 
+# Wykres spektrum częstotliwości
 plt.subplot(2, 1, 2)
 plt.title('Spektrum częstotliwości')
 plt.plot(xf, np.abs(yf))
