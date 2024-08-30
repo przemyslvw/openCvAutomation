@@ -55,4 +55,5 @@ plt.tight_layout()
 plt.savefig('data_plot.png')
 plt.savefig('spectrum_plot.png')
 
+# Wyświetl wykresy
 print("Wykresy zapisane jako 'data_plot.png' i 'spectrum_plot.png'")
