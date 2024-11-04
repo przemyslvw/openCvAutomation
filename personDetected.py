@@ -1,99 +1,84 @@
 import cv2
 import time
+import numpy as np
+import smtplib
+from email.mime.text import MIMEText
+from datetime import datetime
 
 # Adres URL kamery IP
 url = "rtsp://username:password@IP_ADDRESS:PORT"
 
-# Ładowanie modelu MobileNet SSD do wykrywania obiektów
+# Załaduj model wykrywania obiektów
 net = cv2.dnn.readNetFromCaffe("deploy.prototxt", "MobileNetSSD_deploy.caffemodel")
 
 # Lista klas, które model jest w stanie wykryć
-CLASSES = ["background", "person", "bicycle", "car", "motorcycle", "airplane", "bus", 
-           "train", "truck", "boat", "traffic light", "fire hydrant", "stop sign", 
-           "parking meter", "bench", "bird", "cat", "dog", "horse", "sheep", "cow", 
-           "elephant", "bear", "zebra", "giraffe", "backpack", "umbrella", "handbag", 
-           "tie", "suitcase", "frisbee", "skis", "snowboard", "sports ball", "kite", 
-           "baseball bat", "baseball glove", "skateboard", "surfboard", "tennis racket", 
-           "bottle", "wine glass", "cup", "fork", "knife", "spoon", "bowl", "banana", 
-           "apple", "sandwich", "orange", "broccoli", "carrot", "hot dog", "pizza", 
-           "donut", "cake", "chair", "couch", "potted plant", "bed", "dining table", 
-           "toilet", "TV", "laptop", "mouse", "remote", "keyboard", "cell phone", 
-           "microwave", "oven", "toaster", "sink", "refrigerator", "book", "clock", 
-           "vase", "scissors", "teddy bear", "hair drier", "toothbrush"]
+CLASSES = ["background", "person", ...]  # Skrócona lista klas
 
-# Funkcja do nagrywania 5 sekundowego klipu
-def record_video(video_source, duration=5):
-    # Pobieranie bieżącego czasu
-    end_time = time.time() + duration
+# Funkcja wysyłania powiadomienia e-mail
+def send_email_alert():
+    msg = MIMEText("Wykryto osobę w monitorowanej strefie.")
+    msg["Subject"] = "Alert bezpieczeństwa"
+    msg["From"] = "twoj_email@gmail.com"
+    msg["To"] = "odbiorca_email@gmail.com"
     
-    # Otwieranie połączenia z kamerą IP
-    cap = cv2.VideoCapture(video_source)
-    
-    # Ustawienia zapisu wideo
-    fourcc = cv2.VideoWriter_fourcc(*"XVID")
-    out = cv2.VideoWriter("detected_person.avi", fourcc, 20.0, (int(cap.get(3)), int(cap.get(4))))
-    
-    # Nagrywanie przez określony czas
-    while time.time() < end_time:
-        ret, frame = cap.read()
-        if not ret:
-            break
-        out.write(frame)
-    
-    # Zamykanie strumieni
-    out.release()
-    cap.release()
+    # Użyj SMTP, aby wysłać wiadomość e-mail
+    with smtplib.SMTP_SSL("smtp.gmail.com", 465) as server:
+        server.login("twoj_email@gmail.com", "twoje_haslo")
+        server.sendmail("twoj_email@gmail.com", "odbiorca_email@gmail.com", msg.as_string())
 
 # Połączenie z kamerą IP
 cap = cv2.VideoCapture(url)
-
-# Flaga wykrycia osoby
-person_detected = False
+recording = False  # Czy nagrywanie jest aktywne?
+alert_sent = False  # Czy wysłano powiadomienie?
 
 while True:
-    # Pobieranie klatki z kamery
     ret, frame = cap.read()
     if not ret:
         print("Nie udało się pobrać klatki.")
         break
     
-    # Przetwarzanie klatki dla sieci neuronowej
+    # Wykrywanie ruchu
+    if cv2.waitKey(1) & 0xFF == ord("m"):  # Aktywacja na ruch (przykład)
+        continue
+    
     blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
     net.setInput(blob)
     detections = net.forward()
     
-    # Przechodzenie przez wszystkie wykrycia
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
         
-        # Jeśli pewność jest wystarczająco wysoka i wykryty obiekt to "person"
+        # Jeśli wykryto osobę
         if confidence > 0.5:
             idx = int(detections[0, 0, i, 1])
             if CLASSES[idx] == "person":
                 (h, w) = frame.shape[:2]
                 box = detections[0, 0, i, 3:7] * np.array([w, h, w, h])
                 (startX, startY, endX, endY) = box.astype("int")
-                
-                # Rysowanie prostokąta wokół osoby
                 cv2.rectangle(frame, (startX, startY), (endX, endY), (0, 255, 0), 2)
-                label = "{}: {:.2f}%".format(CLASSES[idx], confidence * 100)
-                cv2.putText(frame, label, (startX, startY - 15), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (0, 255, 0), 2)
                 
-                # Wykrycie osoby i uruchomienie zapisu
-                if not person_detected:
-                    print("Wykryto osobę, rozpoczynam nagrywanie.")
-                    person_detected = True
-                    record_video(url, duration=5)
-                    
-                break  # Wychodzimy z pętli, aby uniknąć wielokrotnego nagrywania
+                if not recording:
+                    print("Rozpoczynam nagrywanie.")
+                    out = cv2.VideoWriter(f"{datetime.now().strftime('%Y%m%d_%H%M%S')}.avi",
+                                          cv2.VideoWriter_fourcc(*"XVID"), 20.0, (int(cap.get(3)), int(cap.get(4))))
+                    recording = True
+                    alert_sent = False  # Resetowanie alertu
 
-    # Wyświetlanie obrazu z oznaczeniem osoby
-    cv2.imshow("Kamera IP - Wykrywanie osoby", frame)
+                if not alert_sent:
+                    send_email_alert()
+                    alert_sent = True  # Wysłanie alertu
+                    
+                out.write(frame)  # Nagrywanie klatki
+                
+    if recording and not any([CLASSES[int(detections[0, 0, i, 1])] == "person" for i in range(detections.shape[2])]):
+        print("Zakończono nagrywanie.")
+        recording = False
+        out.release()  # Zakończenie zapisu wideo
+        
+    cv2.imshow("Kamera IP - Monitoring", frame)
     
-    # Przerwanie pętli klawiszem 'q'
     if cv2.waitKey(1) & 0xFF == ord("q"):
         break
 
-# Zwolnienie zasobów
 cap.release()
 cv2.destroyAllWindows()
