@@ -15,9 +15,9 @@ net = cv2.dnn.readNetFromCaffe("deploy.prototxt", "MobileNetSSD_deploy.caffemode
 CLASSES = ["background", "person", ...]  # Skrócona lista klas
 
 # Funkcja wysyłania powiadomienia e-mail
-def send_email_alert():
-    msg = MIMEText("Wykryto osobę w monitorowanej strefie.")
-    msg["Subject"] = "Alert bezpieczeństwa"
+def send_email_alert(subject, message):
+    msg = MIMEText(message)
+    msg["Subject"] = subject
     msg["From"] = "twoj_email@gmail.com"
     msg["To"] = "odbiorca_email@gmail.com"
     
@@ -30,21 +30,38 @@ def send_email_alert():
 cap = cv2.VideoCapture(url)
 recording = False  # Czy nagrywanie jest aktywne?
 alert_sent = False  # Czy wysłano powiadomienie?
+connection_lost_alert = False  # Flaga, czy wysłano alert o utracie połączenia
 
 while True:
     ret, frame = cap.read()
+    
+    # Sprawdzenie, czy połączenie z kamerą jest aktywne
     if not ret:
-        print("Nie udało się pobrać klatki.")
-        break
-    
-    # Wykrywanie ruchu
-    if cv2.waitKey(1) & 0xFF == ord("m"):  # Aktywacja na ruch (przykład)
-        continue
-    
+        print("Utracono połączenie z kamerą.")
+        if not connection_lost_alert:
+            send_email_alert("Alert: Utrata połączenia z kamerą", 
+                             "Połączenie z kamerą IP zostało przerwane.")
+            connection_lost_alert = True  # Ustawiamy flagę, żeby wysłać alert tylko raz
+
+        # Próba ponownego połączenia co 5 sekund
+        time.sleep(5)
+        cap.release()
+        cap = cv2.VideoCapture(url)
+        continue  # Wracamy do początku pętli, by sprawdzić połączenie po wznowieniu
+
+    # Jeśli połączenie zostało wznowione
+    if connection_lost_alert and ret:
+        print("Połączenie z kamerą wznowione.")
+        send_email_alert("Alert: Połączenie z kamerą wznowione", 
+                         "Połączenie z kamerą IP zostało przywrócone.")
+        connection_lost_alert = False  # Reset flagi po przywróceniu połączenia
+
+    # Przetwarzanie obrazu, jeśli kamera jest aktywna
     blob = cv2.dnn.blobFromImage(cv2.resize(frame, (300, 300)), 0.007843, (300, 300), 127.5)
     net.setInput(blob)
     detections = net.forward()
     
+    # Przechodzenie przez wykrycia
     for i in range(detections.shape[2]):
         confidence = detections[0, 0, i, 2]
         
@@ -65,15 +82,16 @@ while True:
                     alert_sent = False  # Resetowanie alertu
 
                 if not alert_sent:
-                    send_email_alert()
+                    send_email_alert("Alert: Wykryto osobę", "Osoba została wykryta w kadrze.")
                     alert_sent = True  # Wysłanie alertu
                     
                 out.write(frame)  # Nagrywanie klatki
                 
+    # Zakończenie nagrywania, gdy brak osób
     if recording and not any([CLASSES[int(detections[0, 0, i, 1])] == "person" for i in range(detections.shape[2])]):
         print("Zakończono nagrywanie.")
         recording = False
-        out.release()  # Zakończenie zapisu wideo
+        out.release()
         
     cv2.imshow("Kamera IP - Monitoring", frame)
     
