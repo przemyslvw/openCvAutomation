@@ -9,6 +9,7 @@ robot_position = [50, 50]  # Startowa pozycja robota na wirtualnej mapie (x, y)
 robot_direction = [1, 0]  # Robot porusza się w prawo
 map_size = (500, 500)     # Rozmiar wirtualnej mapy
 obstacle_map = np.zeros(map_size, dtype=np.uint8)  # Wirtualna mapa przeszkód
+visited_map = np.zeros(map_size, dtype=np.uint8)   # Wirtualna mapa odwiedzonych obszarów
 
 def process_frame(frame):
     """Przetwarzanie klatki wideo i wykrywanie przeszkód."""
@@ -35,16 +36,21 @@ def update_map(obstacles):
         obstacle_map[y:y+h, x:x+w] = 255  # Oznaczanie przeszkód na mapie
 
 def move_robot(obstacles):
-    """Prosty algorytm unikania przeszkód."""
-    global robot_position, robot_direction
+    """Prosty algorytm unikania przeszkód i eksploracji nowych obszarów."""
+    global robot_position, robot_direction, visited_map
 
-    # Sprawdź, czy w kierunku ruchu jest przeszkoda
-    for x, y, w, h in obstacles:
-        if robot_position[0] + robot_direction[0] * 10 in range(x, x + w) and \
-           robot_position[1] + robot_direction[1] * 10 in range(y, y + h):
-            # Zmień kierunek ruchu (np. na lewo)
-            robot_direction[0], robot_direction[1] = -robot_direction[1], robot_direction[0]
-            break
+    # Zaznacz aktualną pozycję jako odwiedzoną
+    visited_map[robot_position[1], robot_position[0]] = 255
+
+    # Sprawdź, czy w kierunku ruchu jest przeszkoda lub odwiedzone miejsce
+    next_position = [
+        robot_position[0] + robot_direction[0] * 10,
+        robot_position[1] + robot_direction[1] * 10
+    ]
+    if (obstacle_map[next_position[1], next_position[0]] == 255 or
+        visited_map[next_position[1], next_position[0]] == 255):
+        # Zmień kierunek ruchu (rotacja o 90 stopni)
+        robot_direction[0], robot_direction[1] = -robot_direction[1], robot_direction[0]
 
     # Aktualizuj pozycję robota
     robot_position[0] += robot_direction[0] * 10
@@ -55,10 +61,14 @@ def move_robot(obstacles):
     robot_position[1] = max(0, min(map_size[1] - 1, robot_position[1]))
 
 def draw_map():
-    """Wyświetlenie wirtualnej mapy z robotem i przeszkodami."""
-    global obstacle_map, robot_position
-    map_display = cv2.cvtColor(obstacle_map, cv2.COLOR_GRAY2BGR)
-    cv2.circle(map_display, tuple(robot_position), 5, (0, 255, 0), -1)  # Robot na mapie
+    """Wyświetlenie wirtualnej mapy z robotem, przeszkodami i odwiedzonymi obszarami."""
+    global obstacle_map, visited_map, robot_position
+
+    # Nakładanie przeszkód i odwiedzonych obszarów
+    map_display = cv2.cvtColor(visited_map, cv2.COLOR_GRAY2BGR)
+    map_display[obstacle_map == 255] = [0, 0, 255]  # Czerwony dla przeszkód
+    cv2.circle(map_display, tuple(robot_position), 5, (0, 255, 0), -1)  # Zielony dla robota
+
     cv2.imshow("Mapa wirtualna", map_display)
 
 while True:
@@ -70,7 +80,7 @@ while True:
     # Przetwarzanie obrazu
     processed_frame, obstacles = process_frame(frame)
 
-    # Aktualizacja mapy
+    # Aktualizacja mapy przeszkód
     update_map(obstacles)
 
     # Ruch robota
