@@ -12,6 +12,10 @@ robot_direction = [1, 0]   # Robot porusza się w prawo
 map_size = (500, 500)      # Rozmiar wirtualnej mapy
 obstacle_map = np.zeros(map_size, dtype=np.uint8)  # Wirtualna mapa przeszkód
 visited_map = np.zeros(map_size, dtype=np.uint8)   # Wirtualna mapa odwiedzonych obszarów
+dock_station = [20, 20]    # Pozycja stacji dokującej
+battery_level = 100        # Poziom baterii (0-100)
+low_battery_threshold = 20 # Próg niskiego poziomu baterii
+charging = False           # Flaga ładowania
 
 # Flaga zakończenia sprzątania
 cleaning_done = False
@@ -42,7 +46,13 @@ def update_map(obstacles):
 
 def move_robot(obstacles):
     """Prosty algorytm unikania przeszkód i eksploracji nowych obszarów."""
-    global robot_position, robot_direction, visited_map, cleaning_done
+    global robot_position, robot_direction, visited_map, cleaning_done, battery_level
+
+    # Zmniejsz poziom baterii
+    battery_level -= 1
+    if battery_level <= 0:
+        print("Bateria rozładowana! Robot zatrzymany.")
+        return
 
     # Zaznacz aktualną pozycję jako odwiedzoną
     visited_map[robot_position[1], robot_position[0]] = 255
@@ -50,7 +60,7 @@ def move_robot(obstacles):
     # Sprawdź, czy wszystkie obszary zostały odwiedzone
     if np.all((visited_map + obstacle_map) > 0):
         cleaning_done = True
-        print("Sprzątanie zakończone! Powrót do punktu startowego.")
+        print("Sprzątanie zakończone! Powrót do stacji dokującej.")
         return
 
     # Sprawdź, czy w kierunku ruchu jest przeszkoda lub odwiedzone miejsce
@@ -71,15 +81,15 @@ def move_robot(obstacles):
     robot_position[0] = max(0, min(map_size[0] - 1, robot_position[0]))
     robot_position[1] = max(0, min(map_size[1] - 1, robot_position[1]))
 
-def find_path_to_start():
-    """Wyznacz trasę powrotu do punktu startowego za pomocą BFS."""
-    global robot_position, robot_start, obstacle_map
+def find_path_to_dock():
+    """Wyznacz trasę powrotu do stacji dokującej za pomocą BFS."""
+    global robot_position, dock_station, obstacle_map
     queue = deque([(robot_position[0], robot_position[1], [])])  # (x, y, ścieżka)
     visited = set()
 
     while queue:
         x, y, path = queue.popleft()
-        if (x, y) == tuple(robot_start):
+        if (x, y) == tuple(dock_station):
             return path  # Znaleziono trasę
 
         # Dodaj obecny punkt do odwiedzonych
@@ -95,13 +105,14 @@ def find_path_to_start():
     return None  # Brak trasy (teoretycznie niemożliwe)
 
 def draw_map():
-    """Wyświetlenie wirtualnej mapy z robotem, przeszkodami i odwiedzonymi obszarami."""
-    global obstacle_map, visited_map, robot_position
+    """Wyświetlenie wirtualnej mapy z robotem, przeszkodami, stacją dokującą i odwiedzonymi obszarami."""
+    global obstacle_map, visited_map, robot_position, dock_station
 
     # Nakładanie przeszkód i odwiedzonych obszarów
     map_display = cv2.cvtColor(visited_map, cv2.COLOR_GRAY2BGR)
     map_display[obstacle_map == 255] = [0, 0, 255]  # Czerwony dla przeszkód
     cv2.circle(map_display, tuple(robot_position), 5, (0, 255, 0), -1)  # Zielony dla robota
+    cv2.circle(map_display, tuple(dock_station), 5, (255, 0, 0), -1)    # Niebieski dla stacji dokującej
 
     cv2.imshow("Mapa wirtualna", map_display)
 
@@ -117,16 +128,22 @@ while True:
     # Aktualizacja mapy przeszkód
     update_map(obstacles)
 
-    if cleaning_done:
-        # Wyznacz trasę powrotu do punktu startowego
-        path_to_start = find_path_to_start()
-        if path_to_start:
-            for pos in path_to_start:
+    if charging:
+        # Symulacja ładowania
+        battery_level += 1
+        if battery_level >= 100:
+            charging = False
+            print("Bateria naładowana! Wznowienie sprzątania.")
+    elif battery_level <= low_battery_threshold or cleaning_done:
+        # Wyznacz trasę do stacji dokującej
+        path_to_dock = find_path_to_dock()
+        if path_to_dock:
+            for pos in path_to_dock:
                 robot_position[0], robot_position[1] = pos
                 draw_map()
                 cv2.waitKey(100)  # Symulacja ruchu
-            print("Robot wrócił do punktu startowego.")
-            break
+            print("Robot dotarł do stacji dokującej.")
+            charging = True
     else:
         # Ruch robota
         move_robot(obstacles)
@@ -138,9 +155,4 @@ while True:
     draw_map()
 
     # Wyjście z pętli
-    if cv2.waitKey(1) & 0xFF == ord('q'):
-        break
-
-# Zwolnienie zasobów
-cap.release()
-cv2.destroyAllWindows()
+    if cv2.waitKey(1) & 0xFF
